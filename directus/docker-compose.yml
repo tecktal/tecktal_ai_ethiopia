@@ -1,0 +1,83 @@
+services:
+  directus:
+    image: tecktal/directus-custom:latest
+    ports:
+      - 8055:8055
+    environment:
+      KEY: 'replace-with-random-key'
+      SECRET: 'replace-with-random-secret'
+      ADMIN_EMAIL: 'admin@directus.com'
+      ADMIN_PASSWORD: 'admin'
+      DB_CLIENT: 'pg'
+      DB_HOST: 'postgres'
+      DB_PORT: '5432'
+      DB_DATABASE: 'directus'
+      DB_USER: 'directus'
+      DB_PASSWORD: 'directus'
+      CORS_ENABLED: 'true'
+      CORS_ORIGIN: 'true'
+      WEBSOCKETS_ENABLED: 'true'
+    volumes:
+      - directus_uploads:/directus/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: tecktal/directus-postgres:latest
+    restart: always
+    environment:
+      POSTGRES_DB: directus
+      POSTGRES_USER: directus
+      POSTGRES_PASSWORD: directus
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U directus"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    restart: unless-stopped
+
+  rag-service:
+    image: tecktal/directus-rag-service:latest
+    ports:
+      - "8000:8000"
+    environment:
+      QDRANT_HOST: "qdrant"
+      QDRANT_PORT: "6333"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+    volumes:
+      - directus_uploads:/app/uploads:ro
+      - model_cache:/root/.cache/huggingface
+    depends_on:
+      - qdrant
+    restart: unless-stopped
+
+  pdf-service:
+    image: tecktal/directus-pdf-service:latest
+    ports:
+      - "8001:8001"
+    environment:
+      POSTGRES_HOST: "postgres"
+      POSTGRES_DB: directus
+      POSTGRES_USER: directus
+      POSTGRES_PASSWORD: directus
+    volumes:
+      - directus_uploads:/directus/uploads
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  qdrant_storage:
+  directus_uploads:
+  model_cache:

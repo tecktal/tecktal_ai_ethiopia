@@ -1,0 +1,87 @@
+# ----------------------------------------
+# OS FILES
+# ----------------------------------------
+.DS_Store
+Thumbs.db
+
+# ----------------------------------------
+# ENVIRONMENT VARIABLES
+# ----------------------------------------
+.env
+*.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# ----------------------------------------
+# DIRECTUS FILES
+# ----------------------------------------
+directus/uploads/
+directus/extensions/node_modules/
+directus/node_modules/
+
+# Ignore generated snapshot files
+directus/snapshot.yaml
+snapshot.yaml
+
+# ----------------------------------------
+# LIBRECHAT FILES
+# ----------------------------------------
+libreChat/node_modules/
+libreChat/.cache/
+libreChat/logs/
+libreChat/tmp/
+
+# LibreChat environment files
+libreChat/.env
+libreChat/.env.*
+
+# ----------------------------------------
+# DOCKER
+# ----------------------------------------
+postgres_data/
+directus_data/
+*postgres_data*
+*directus_data*
+docker-data/
+docker-volumes/
+*.pid
+
+# Ignore auto-generated override files
+docker-compose.override.yml
+
+# ----------------------------------------
+# LOGS
+# ----------------------------------------
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ----------------------------------------
+# BUILD ARTIFACTS
+# ----------------------------------------
+dist/
+build/
+.cache/
+.tmp/
+*.sqlite
+*.db
+
+# ----------------------------------------
+# EDITOR / IDE SETTINGS
+# ----------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ----------------------------------------
+# BACKUPS
+# ----------------------------------------
+*.sql
+*.bak
+*.backup
+backup_*.sql
