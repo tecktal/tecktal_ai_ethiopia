@@ -16,15 +16,17 @@ services:
       DB_PASSWORD: 'directus'
       CORS_ENABLED: 'true'
       CORS_ORIGIN: 'true'
-      WEBSOCKETS_ENABLED: 'true'
     volumes:
       - directus_uploads:/directus/uploads
+      - ./import-flows.sh:/tmp/import-flows.sh
+      - ./flows-data.sql:/tmp/flows-data.sql:ro
+      - ./snapshot.yaml:/directus/snapshot.yaml:ro
     depends_on:
       postgres:
         condition: service_healthy
 
   postgres:
-    image: tecktal/directus-postgres:latest
+    image: postgres:15
     restart: always
     environment:
       POSTGRES_DB: directus

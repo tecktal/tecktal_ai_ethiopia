@@ -1,0 +1,509 @@
+# Directus MCP Server Instructions
+
+## Overview
+
+This MCP server provides READ-ONLY access to a Directus-based Learning Management System (LMS). The primary use cases are:
+1. Course hierarchy navigation (courses → modules → lessons)
+2. Lesson plan retrieval and in-memory preview
+3. Quiz and assessment queries
+4. Lesson content retrieval (videos, assignments, simulations)
+
+**CRITICAL:** This server is READ-ONLY. No create, update, or delete operations are permitted.
+
+---
+
+## Data Model Overview
+
+### Core Collections & Relationships
+
+```
+lms_courses (Main container)
+  ├─ modules: o2m → lms_modules
+  │   ├─ lessons: o2m → lms_lessons
+  │   │   ├─ Lesson_Plan: o2m → Learning_paths
+  │   │   ├─ assignements: o2m → lms_assignement
+  │   │   └─ lms_simulations: o2m → lms_simulations
+  │   └─ Quizzs: via related_module → quizz
+  │       └─ quiz_questions: m2m → question_bank (via quizz_question_bank)
+```
+
+### Key Field Naming Patterns
+
+**CRITICAL:** Relationship fields do NOT use "_id" suffix:
+- ✅ `{"course": {"_eq": "..."}}` 
+- ❌ `{"course_id": {"_eq": "..."}}` (causes permission errors)
+
+**Correct field names:**
+- lms_modules → lms_courses: `course` field
+- lms_lessons → lms_modules: `module` field  
+- Learning_paths → lms_lessons: `lesson` field
+- quizz → lms_modules: `related_module` field
+
+---
+
+## Collection Schemas
+
+### lms_courses
+
+**Purpose:** Course catalog entries
+
+**Key Fields:**
+- `id` (uuid, primary key)
+- `title` (string, required)
+- `slug` (string, unique)
+- `description` (text, short)
+- `description_long` (text, rich HTML)
+- `status` (draft | review | published | archived)
+- `image` (uuid → directus_files)
+
+**Relationships:**
+- `modules` (o2m → lms_modules)
+
+**Query Pattern:**
+```json
+{
+  "collection": "lms_courses",
+  "query": {
+    "filter": {"status": {"_eq": "published"}},
+    "fields": ["id", "title", "slug", "description"]
+  }
+}
+```
+
+---
+
+### lms_modules
+
+**Purpose:** Course sections/modules
+
+**Key Fields:**
+- `id` (uuid, primary key)
+- `title` (string, required)
+- `description` (text)
+- `course` (uuid → lms_courses, m2o)
+
+**Relationships:**
+- `lessons` (o2m → lms_lessons)
+
+**Query Pattern:**
+```json
+{
+  "collection": "lms_modules",
+  "query": {
+    "filter": {"course": {"_eq": "COURSE_ID"}},
+    "fields": ["id", "title", "description"],
+    "sort": ["sort"]
+  }
+}
+```
+
+**Common Mistake:**
+```json
+❌ {"course_id": {"_eq": "..."}}  // Permission error
+✅ {"course": {"_eq": "..."}}     // Correct
+```
+
+---
+
+### lms_lessons
+
+**Purpose:** Individual lesson content
+
+**Key Fields:**
+- `id` (uuid, primary key)
+- `title` (string, required)
+- `slug` (string, unique)
+- `module` (uuid → lms_modules, m2o)
+- `status` (published | draft | archived)
+- `content` (text, rich HTML)
+
+**Video Fields (Group):**
+- `video_type` (file | url)
+- `video_file` (uuid → directus_files, conditional)
+- `video_url` (string, conditional)
+- `video_duration` (integer, seconds)
+- `video_transcript` (text)
+- `video_chapters` (json array: [{name, seconds}])
+
+**Relationships:**
+- `Lesson_Plan` (o2m → Learning_paths)
+- `assignements` (o2m → lms_assignement)
+- `lms_simulations` (o2m → lms_simulations)
+
+**Query Pattern:**
+```json
+{
+  "collection": "lms_lessons",
+  "query": {
+    "filter": {"module": {"_eq": "MODULE_ID"}},
+    "fields": [
+      "id", "title", "slug", "content",
+      "video_type", "video_url", "video_file", 
+      "video_duration", "video_transcript"
+    ],
+    "sort": ["sort"]
+  }
+}
+```
+
+---
+
+### Learning_paths
+
+**Purpose:** Lesson plans with HTML content and PDF links
+
+**Key Fields:**
+- `id` (integer, primary key, auto-increment)
+- `lesson` (uuid → lms_lessons, m2o, required)
+- `Learning_path` (text, rich HTML) - **The lesson plan content**
+- `url` (string) - **PDF link to lesson plan**
+
+**Query Pattern:**
+```json
+{
+  "collection": "Learning_paths",
+  "query": {
+    "filter": {"lesson": {"_eq": "LESSON_ID"}},
+    "fields": ["id", "Learning_path", "url"]
+  }
+}
+```
+
+**Usage Notes:**
+- `Learning_path`: Full HTML content of lesson plan (display to user)
+- `url`: PDF download link (provide when requested)
+- This is READ-ONLY: modifications are in-memory only, never written back
+
+---
+
+### quizz
+
+**Purpose:** Quizzes/assessments for modules
+
+**Key Fields:**
+- `id` (uuid, primary key)
+- `title` (string)
+- `description` (text, rich HTML)
+- `related_course` (uuid → lms_courses, m2o)
+- `related_module` (uuid → lms_modules, m2o)
+- `lesson` (uuid → lms_lessons)
+- `status` (published | draft | archived)
+
+**Relationships:**
+- `quiz_questions` (m2m → question_bank via quizz_question_bank junction)
+
+**Query Pattern (with questions):**
+```json
+{
+  "collection": "quizz",
+  "query": {
+    "filter": {"related_module": {"_eq": "MODULE_ID"}},
+    "fields": [
+      "id", "title", "description",
+      "quiz_questions.question_bank_id.id",
+      "quiz_questions.question_bank_id.question_text",
+      "quiz_questions.question_bank_id.question_type",
+      "quiz_questions.question_bank_id.answers",
+      "quiz_questions.question_bank_id.answer",
+      "quiz_questions.question_bank_id.correct_answer"
+    ]
+  }
+}
+```
+
+**CRITICAL:** Quizzes are linked to MODULES, not lessons. Use `related_module` field.
+
+---
+
+### question_bank
+
+**Purpose:** Question repository for quizzes
+
+**Key Fields:**
+- `id` (uuid, primary key)
+- `question_text` (string)
+- `question_type` (Multiple-choice | true-false | open-answer)
+- `Explanation` (text, rich HTML)
+
+**Conditional Fields (based on question_type):**
+- `answers` (json, for Multiple-choice): `[{answer: string, is_correct: boolean}]`
+- `answer` (string, for true-false): "true" or "false"
+- `correct_answer` (string, for open-answer): Expected answer text
+
+**Data Structure Examples:**
+
+**Multiple-choice:**
+```json
+{
+  "question_text": "What is 2 + 2?",
+  "question_type": "Multiple-choice",
+  "answers": [
+    {"answer": "A. 3", "is_correct": false},
+    {"answer": "B. 4", "is_correct": true},
+    {"answer": "C. 5", "is_correct": false}
+  ]
+}
+```
+
+**True-false:**
+```json
+{
+  "question_text": "Is 5 > 3?",
+  "question_type": "true-false",
+  "answer": "true"
+}
+```
+
+**Open-answer:**
+```json
+{
+  "question_text": "What is the capital of France?",
+  "question_type": "open-answer",
+  "correct_answer": "Paris"
+}
+```
+
+---
+
+### lms_assignement
+
+**Purpose:** Assignments for lessons
+
+**Key Fields:**
+- `id` (uuid, primary key)
+- `title` (string, required)
+- `description` (text)
+- `instructions` (text, rich HTML)
+- `file` (uuid → directus_files)
+- `lesson` (uuid → lms_lessons)
+- `status` (published | draft | archived)
+
+**Query Pattern:**
+```json
+{
+  "collection": "lms_assignement",
+  "query": {
+    "filter": {"lesson": {"_eq": "LESSON_ID"}},
+    "fields": ["id", "title", "description", "instructions", "file"]
+  }
+}
+```
+
+---
+
+### lms_simulations
+
+**Purpose:** Interactive simulations/demos
+
+**Key Fields:**
+- `id` (uuid, primary key)
+- `title` (string, required)
+- `slug` (string)
+- `description` (text)
+- `code` (text, HTML/JS code)
+- `lesson` (uuid → lms_lessons, m2o)
+- `status` (published | draft | archived)
+
+**Query Pattern:**
+```json
+{
+  "collection": "lms_simulations",
+  "query": {
+    "filter": {"lesson": {"_eq": "LESSON_ID"}},
+    "fields": ["id", "title", "description", "code"]
+  }
+}
+```
+
+---
+
+## Common Query Patterns
+
+### Pattern 1: Course Hierarchy (Full Tree)
+
+**Goal:** Get course with all modules and lesson titles
+
+```json
+{
+  "collection": "lms_courses",
+  "query": {
+    "filter": {"id": {"_eq": "COURSE_ID"}},
+    "fields": [
+      "id", "title",
+      "modules.id",
+      "modules.title",
+      "modules.lessons.id",
+      "modules.lessons.title"
+    ]
+  }
+}
+```
+
+### Pattern 2: Find Lesson by Title (with Module Info)
+
+```json
+{
+  "collection": "lms_lessons",
+  "query": {
+    "filter": {"title": {"_icontains": "SEARCH_TERM"}},
+    "fields": [
+      "id", "title", "slug",
+      "module.id", "module.title",
+      "module.course.id", "module.course.title"
+    ]
+  }
+}
+```
+
+### Pattern 3: Get Quiz for Module (with All Questions)
+
+**Step 1:** Get lesson with module ID
+```json
+{
+  "collection": "lms_lessons",
+  "query": {
+    "filter": {"title": {"_icontains": "LESSON_TITLE"}},
+    "fields": ["id", "module.id"]
+  }
+}
+```
+
+**Step 2:** Get quiz using module ID
+```json
+{
+  "collection": "quizz",
+  "query": {
+    "filter": {"related_module": {"_eq": "MODULE_ID"}},
+    "fields": [
+      "id", "title", "description",
+      "quiz_questions.question_bank_id.*"
+    ]
+  }
+}
+```
+
+### Pattern 4: Complete Lesson Content Package
+
+**Get everything about a lesson in one query:**
+```json
+{
+  "collection": "lms_lessons",
+  "query": {
+    "filter": {"id": {"_eq": "LESSON_ID"}},
+    "fields": [
+      "id", "title", "content",
+      "video_type", "video_url", "video_duration", "video_transcript",
+      "Lesson_Plan.Learning_path",
+      "Lesson_Plan.url",
+      "assignements.id",
+      "assignements.title",
+      "lms_simulations.id",
+      "lms_simulations.title"
+    ]
+  }
+}
+```
+
+---
+
+## Error Handling Guidelines
+
+### Permission Errors
+
+**Common cause:** Using field name with "_id" suffix
+
+```
+Error: "You don't have permission to access field 'course_id'"
+```
+
+**Solution:** Remove "_id" suffix
+- ❌ `course_id` → ✅ `course`
+- ❌ `module_id` → ✅ `module`
+- ❌ `lesson_id` → ✅ `lesson`
+
+### Empty Results
+
+**If no results found:**
+1. Try broader filter (e.g., `_icontains` instead of `_eq`)
+2. Check if item exists in different status (draft vs published)
+3. Verify relationship field names are correct
+
+### Collection Not Found (404)
+
+**Common causes:**
+- Collection name typo
+- Using junction table directly (use deep fields instead)
+
+**Solution:** Use `read-collections` to verify exact collection names
+
+---
+
+## Tool Usage Strategy
+
+### Multi-Step Queries
+
+For complex requests, break into steps:
+
+**Example:** "Get quiz for Lesson 1"
+
+```
+Step 1: Find lesson → get module ID
+Step 2: Find quiz by module ID → get quiz details
+Step 3: Extract questions from quiz
+```
+
+### Silent Retries
+
+When a query fails:
+1. Analyze the error
+2. Adjust approach (different filter, field name, etc.)
+3. Retry up to 2-3 times
+4. Only report to user after all attempts fail
+
+**Do NOT show intermediate failures to user**
+
+### Deep Field Notation
+
+Use dot notation for nested relationships:
+- `module.title` - Get related module's title
+- `quiz_questions.question_bank_id.*` - Get all question fields
+- `Lesson_Plan.Learning_path` - Get lesson plan content
+
+---
+
+## Status Field Values
+
+**Common status values across collections:**
+- `draft` - Work in progress
+- `published` - Public/active
+- `review` - Awaiting approval
+- `archived` - Deprecated/hidden
+
+**Default filters:**
+- For end-users: Filter by `status=published`
+- For content creators: Show all statuses
+
+---
+
+## Performance Tips
+
+1. **Use `fields` parameter** - Only request needed fields
+2. **Use `limit` parameter** - For large collections
+3. **Use `sort` parameter** - Leverage existing sort values
+4. **Deep fields over multiple queries** - Fetch nested data in one call when possible
+
+---
+
+## Summary: Critical Rules
+
+1. ✅ **READ-ONLY** - Never use create/update/delete operations
+2. ✅ **No "_id" suffix** - Relationship fields: `course`, `module`, `lesson`
+3. ✅ **Quizzes via modules** - Use `related_module` field, not `lesson`
+4. ✅ **Silent retries** - Try multiple approaches before reporting errors
+5. ✅ **Deep fields** - Use dot notation for nested data
+6. ✅ **Status filtering** - Default to `published` for end-users
+7. ✅ **Learning_path vs url** - Both available, `url` is PDF link
+
+---
+
+**End of MCP Server Instructions**
