@@ -155,6 +155,12 @@ Login with:
 | RAG Service | 8000 | AI content generation |
 | PDF Service | 8001 | HTML to PDF conversion |
 
+### Step 1.6: Enable MCP
+Open the settings and in the tab **AI** enable MCP.
+Then in the **Custom System Prompt** field, paste the content of the file
+`tecktal_ai_ethiopia/librechat/directus_mcp_instructions.txt`
+
+
 ---
 
 ## Part 2: LibreChat Setup
