@@ -21,9 +21,7 @@ directus/uploads/
 directus/extensions/node_modules/
 directus/node_modules/
 
-# Ignore generated snapshot files
-directus/snapshot.yaml
-snapshot.yaml
+
 
 # ----------------------------------------
 # LIBRECHAT FILES
@@ -81,7 +79,5 @@ build/
 # ----------------------------------------
 # BACKUPS
 # ----------------------------------------
-*.sql
 *.bak
 *.backup
-backup_*.sql
