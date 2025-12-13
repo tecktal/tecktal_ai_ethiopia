@@ -148,9 +148,14 @@ lms_courses (Main container)
 
 ---
 
-### Learning_paths
+### Learning_paths (EXACT COLLECTION NAME - CASE SENSITIVE)
 
 **Purpose:** Lesson plans with HTML content and PDF links
+
+**CRITICAL NAMING:**
+- Collection name: `Learning_paths` (capital L, capital P)
+- Content field: `Learning_path` (capital L, capital P)
+- NEVER use: `learning_paths`, `learning_path`, `lesson_plans`
 
 **Key Fields:**
 - `id` (integer, primary key, auto-increment)
@@ -158,7 +163,7 @@ lms_courses (Main container)
 - `Learning_path` (text, rich HTML) - **The lesson plan content**
 - `url` (string) - **PDF link to lesson plan**
 
-**Query Pattern:**
+**Correct Query Pattern:**
 ```json
 {
   "collection": "Learning_paths",
@@ -169,11 +174,38 @@ lms_courses (Main container)
 }
 ```
 
-**Usage Notes:**
-- `Learning_path`: Full HTML content of lesson plan (display to user)
-- `url`: PDF download link (provide when requested)
-- This is READ-ONLY: modifications are in-memory only, never written back
+**Common Mistakes:**
+```json
+❌ {"collection": "learning_paths"} // Wrong case
+❌ {"collection": "lessons"}         // Wrong collection
+❌ {"fields": ["learning_path"]}     // Wrong field case
+✅ {"collection": "Learning_paths"}  // CORRECT
+✅ {"fields": ["Learning_path"]}     // CORRECT
+```
 
+**Two-Step Retrieval Process:**
+
+Step 1: Get lesson ID from lms_lessons
+```json
+{
+  "collection": "lms_lessons",
+  "query": {
+    "filter": {"title": {"_icontains": "lesson title"}},
+    "fields": ["id", "title"]
+  }
+}
+```
+
+Step 2: Use lesson ID to get lesson plan
+```json
+{
+  "collection": "Learning_paths",
+  "query": {
+    "filter": {"lesson": {"_eq": "ID_FROM_STEP_1"}},
+    "fields": ["Learning_path", "url"]
+  }
+}
+```
 ---
 
 ### quizz

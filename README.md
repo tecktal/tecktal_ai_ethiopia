@@ -305,7 +305,7 @@ mcpServers:
 docker compose up -d
 ```
 
-Wait for all services to start (first run may take a few minutes).
+Wait for all services to start (FIRST RUN MAY TAKE A FEW MINUTES).
 
 ### Step 2.6: Access LibreChat
 
