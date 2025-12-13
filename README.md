@@ -327,7 +327,7 @@ Open your browser: **http://localhost:3080**
 
 | Field | Value |
 |-------|-------|
-| **Name** | LMS Research Assistant |
+| **Name** | AI Tutor |
 | **Description** | AI assistant for navigating LMS course content |
 | **Model** | `gpt-4-turbo` or `gpt-4o` (NOT gpt-4-0613 - context too small) |
 
