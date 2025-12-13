@@ -79,7 +79,7 @@ mkdir tecktal
 cd tecktal
 
 # Clone this repository
-git clone https://github.com/YOUR_USERNAME/tecktal_ai_ethiopia.git
+git clone https://github.com/tecktal/tecktal_ai_ethiopia.git
 
 # Clone LibreChat (only if you want the AI assistant)
 git clone https://github.com/danny-avila/LibreChat.git
