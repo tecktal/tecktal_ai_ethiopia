@@ -1,3 +1,14 @@
+# Docker Compose Override for LibreChat with Directus MCP
+# 
+# This file extends the default LibreChat docker-compose.yml
+# to add Directus MCP support and environment variables.
+#
+# Usage:
+#   1. Copy this file to LibreChat folder as: docker-compose.override.yml
+#   2. Copy librechat.yaml to LibreChat folder
+#   3. Add DIRECTUS_URL and DIRECTUS_TOKEN to LibreChat/.env
+#   4. Run: docker compose up -d
+
 services:
   api:
     volumes:
@@ -6,6 +17,9 @@ services:
         target: /app/librechat.yaml
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    environment:
+      - DIRECTUS_URL=${DIRECTUS_URL}
+      - DIRECTUS_TOKEN=${DIRECTUS_TOKEN}
     command: >
       sh -c "npm install -g @directus/content-mcp@latest --force &&
              npm cache clean --force &&
